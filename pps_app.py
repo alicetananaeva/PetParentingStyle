@@ -3,7 +3,7 @@ pps_app.py
 ==========
 
 Pet Parenting Style (PPS) — Streamlit app: one item per screen, research consent
-flow, contact, optional demographics, result, completion — aligned with
+flow, contact, optional pet demographics, result, completion — aligned with
 ``DSLQ_App/dslq_app.py``. Scoring: ``pps_scoring_baseline.py`` + margin labels
 ``pps_mixed_ambiguous_logic`` (ambiguous if margin < 1/24).
 
@@ -24,7 +24,6 @@ import pandas as pd
 import streamlit as st
 
 from pps_research import (
-    HUMAN_DEMO_EXCLUDED_FIELD_KEYS,
     build_pps_export,
     is_valid_email_simple,
     persist_pps_contact,
@@ -246,9 +245,8 @@ def _normalize_mixed_markdown(text: str) -> str:
 
 def build_mixed_intro_text(primary_style: str, secondary_style: str) -> str:
     tmpl = c("result_mixed_intro_template", "")
-    primary_full = c(interpretation_key_for_style(primary_style), "")
-    primary_desc = strip_style_headline_for_mixed_body(primary_full).strip()
-    secondary_desc = mixed_secondary_snippet(secondary_style).strip()
+    primary_desc = c(interpretation_key_for_style(primary_style), "").strip()
+    secondary_desc = c(interpretation_key_for_style(secondary_style), "").strip()
     filled = tmpl.format(
         primary_style=primary_style,
         secondary_style=secondary_style,
@@ -337,11 +335,9 @@ N_ITEMS = len(ITEM_IDS)
 def _reset_research_state() -> None:
     st.session_state["choices"] = {
         "share_questionnaire_data": False,
-        "share_demographic_data": False,
         "future_contact": False,
     }
     st.session_state["dog_demo"] = {}
-    st.session_state["human_demo"] = {}
     st.session_state["contact"] = {}
     st.session_state["export_blob"] = None
     st.session_state["saved_path"] = None
@@ -367,11 +363,9 @@ def init_state() -> None:
     }
     defaults["choices"] = {
         "share_questionnaire_data": False,
-        "share_demographic_data": False,
         "future_contact": False,
     }
     defaults["dog_demo"] = {}
-    defaults["human_demo"] = {}
     defaults["contact"] = {}
     defaults["export_blob"] = None
     defaults["saved_path"] = None
@@ -417,12 +411,11 @@ def wrap_up_and_show_result() -> None:
         s_st,
         {k: st.session_state["responses"].get(k) for k in ITEM_IDS},
         st.session_state["dog_demo"],
-        st.session_state["human_demo"],
         st.session_state["contact"],
         ch,
     )
     st.session_state["export_blob"] = payload
-    if ch.get("share_questionnaire_data") or ch.get("share_demographic_data"):
+    if ch.get("share_questionnaire_data"):
         pth = persist_pps_session(payload, _ROOT)
         st.session_state["saved_path"] = str(pth) if pth else None
     else:
@@ -568,13 +561,6 @@ def screen_sharing() -> None:
             ),
             value=bool(st.session_state["choices"].get("share_questionnaire_data")),
         )
-        share_d = st.checkbox(
-            c(
-                "share_d_checkbox",
-                "I agree to share demographic information for research.",
-            ),
-            value=bool(st.session_state["choices"].get("share_demographic_data")),
-        )
         c_back, c_cont = st.columns([1, 2])
         b_back = c_back.form_submit_button(c("back_button", "← Back"))
         b_cont = c_cont.form_submit_button(c("continue_button", "Continue →"), type="primary")
@@ -584,7 +570,6 @@ def screen_sharing() -> None:
         go("questionnaire")
     if b_cont:
         st.session_state["choices"]["share_questionnaire_data"] = share_q
-        st.session_state["choices"]["share_demographic_data"] = share_d
         go("contact")
 
 
@@ -643,7 +628,7 @@ def screen_contact() -> None:
         contact["contact_name"] = name_val
         contact["contact_email"] = email_val
         st.session_state["contact"] = contact
-        if ch.get("share_questionnaire_data") or ch.get("share_demographic_data"):
+        if ch.get("share_questionnaire_data"):
             go("demographics")
         else:
             wrap_up_and_show_result()
@@ -652,12 +637,10 @@ def screen_contact() -> None:
 def screen_demographics() -> None:
     ch = st.session_state["choices"]
     share_q = ch["share_questionnaire_data"]
-    share_d = ch["share_demographic_data"]
     dog_demo: Dict[str, Any] = dict(st.session_state.get("dog_demo", {}))
-    hum_demo: Dict[str, Any] = dict(st.session_state.get("human_demo", {}))
     contact: Dict[str, Any] = dict(st.session_state.get("contact", {}))
 
-    if OPTIONAL_DF.empty or (not share_q and not share_d):
+    if OPTIONAL_DF.empty or not share_q:
         wrap_up_and_show_result()
         return
 
@@ -707,60 +690,6 @@ def screen_demographics() -> None:
                     dog_demo[fk] = sel
                     dog_demo[f"{fk}_txt"] = extra
 
-        if share_d:
-            st.markdown(f"### {c('human_demo_title', 'Optional information about you')}")
-            fut_yes = bool(ch.get("future_contact"))
-            act_yes = hum_demo.get("human_dog_activity") == "Yes"
-            hrows = OPTIONAL_DF[OPTIONAL_DF["section"] == "human_demographics_optional"].sort_values(
-                "display_order"
-            )
-            for _, f in hrows.iterrows():
-                fk = str(f["field_key"])
-                qtxt = str(f["question_text"])
-                rtype = str(f["response_type"])
-                show_if = str(f["show_if"]) if pd.notna(f.get("show_if")) else ""
-                if fk in HUMAN_DEMO_EXCLUDED_FIELD_KEYS:
-                    continue
-                if "future_contact = Yes" in show_if and not fut_yes:
-                    continue
-                if "human_dog_activity = Yes" in show_if and not act_yes:
-                    continue
-                if rtype == "single_select":
-                    if fk == "future_contact":
-                        continue
-                    opts = [o.strip() for o in str(f["options_pipe_delimited"]).split("|")]
-                    cur = hum_demo.get(fk, opts[0])
-                    val = st.selectbox(
-                        qtxt,
-                        options=opts,
-                        index=opts.index(cur) if cur in opts else 0,
-                        key=f"hd_{fk}",
-                    )
-                    hum_demo[fk] = val
-                    if fk == "human_dog_activity":
-                        act_yes = val == "Yes"
-                elif rtype == "multi_select":
-                    opts = [o.strip() for o in str(f["options_pipe_delimited"]).split("|")]
-                    hum_demo[fk] = st.multiselect(
-                        qtxt, options=opts, default=hum_demo.get(fk, []), key=f"hd_{fk}"
-                    )
-                elif rtype == "single_select_plus_multiselect":
-                    opts = [o.strip() for o in str(f["options_pipe_delimited"]).split("|")]
-                    cur = hum_demo.get(fk, opts[0])
-                    val = st.selectbox(
-                        qtxt,
-                        options=opts,
-                        index=opts.index(cur) if cur in opts else 0,
-                        key=f"hd_{fk}_m",
-                    )
-                    hum_demo[fk] = val
-                    if fk == "human_dog_activity":
-                        act_yes = val == "Yes"
-                elif rtype in ("text", "email"):
-                    hum_demo[fk] = st.text_input(
-                        qtxt, value=str(hum_demo.get(fk, "")), key=f"hd_{fk}"
-                    )
-
         c_b, c_f = st.columns([1, 2])
         b_b = c_b.form_submit_button(c("back_button", "← Back"))
         b_f = c_f.form_submit_button(c("continue_button", "Continue →"), type="primary")
@@ -769,7 +698,6 @@ def screen_demographics() -> None:
         go("contact")
     if b_f:
         st.session_state["dog_demo"] = dog_demo
-        st.session_state["human_demo"] = hum_demo
         st.session_state["contact"] = contact
         st.session_state["choices"] = ch
         wrap_up_and_show_result()
@@ -794,7 +722,7 @@ def screen_result() -> None:
     col_b, col_n = st.columns([1, 2])
     if col_b.button(c("back_button", "← Back"), key="result_back"):
         ch = st.session_state.get("choices", {})
-        if ch.get("share_questionnaire_data") or ch.get("share_demographic_data"):
+        if ch.get("share_questionnaire_data"):
             go("demographics")
         else:
             go("contact")
@@ -804,9 +732,7 @@ def screen_result() -> None:
 
 def screen_completion() -> None:
     ch = st.session_state.get("choices", {})
-    saved_data = bool(
-        ch.get("share_questionnaire_data") or ch.get("share_demographic_data")
-    )
+    saved_data = bool(ch.get("share_questionnaire_data"))
     wants_contact = bool(
         ch.get("future_contact")
         and str((st.session_state.get("contact") or {}).get("contact_email") or "").strip()

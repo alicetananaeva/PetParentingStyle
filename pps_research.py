@@ -30,28 +30,6 @@ APP_VERSION = "v1"
 APP_TABLE_SESSIONS = "pps_sessions"
 APP_TABLE_CONTACTS = "pps_contacts"
 
-# Identity / contact must not be duplicated in human_demographics (same as DSLQ).
-HUMAN_DEMO_EXCLUDED_FIELD_KEYS = frozenset(
-    {
-        "contact_name",
-        "contact_email",
-        "first_name",
-        "last_name",
-        "surname",
-        "human_first_name",
-        "human_last_name",
-        "participant_name",
-        "owner_name",
-        "human_name",
-        "future_contact",
-    }
-)
-
-
-def _human_demo_for_export(human_demo: Dict[str, Any]) -> Dict[str, Any]:
-    return {k: v for k, v in human_demo.items() if k not in HUMAN_DEMO_EXCLUDED_FIELD_KEYS}
-
-
 def answers_to_item_numeric(responses: Dict[str, Optional[str]]) -> Dict[str, int]:
     """Map item id -> Likert 1-5; raises if missing/invalid."""
     out: Dict[str, int] = {}
@@ -112,7 +90,6 @@ def build_pps_export(
     secondary_style: str,
     responses: Dict[str, Optional[str]],
     dog_demo: Dict[str, Any],
-    human_demo: Dict[str, Any],
     contact: Dict[str, Any],
     choices: Dict[str, Any],
 ) -> Dict[str, Any]:
@@ -143,7 +120,6 @@ def build_pps_export(
         "raw_answers_json": {"pps_items": item_numeric, "likert_order": list(LIKERT_LABELS)},
         "research_choices": dict(choices),
         "dog_demographics": dog_demo,
-        "human_demographics": _human_demo_for_export(human_demo),
         "contact_details": contact,
     }
 
@@ -178,9 +154,7 @@ def _supabase_pps_insert(payload: Dict[str, Any]) -> bool:
             "raw_answers_json": payload.get("raw_answers_json"),
             "research_choices": payload.get("research_choices"),
             "dog_demographics": payload.get("dog_demographics"),
-            "human_demographics": payload.get("human_demographics"),
             "consented_questionnaire": bool(ch.get("share_questionnaire_data")),
-            "consented_demographics": bool(ch.get("share_demographic_data")),
         }
         # Drop None values for optional columns
         record = {k: v for k, v in record.items() if v is not None}

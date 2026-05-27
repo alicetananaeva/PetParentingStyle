@@ -4,7 +4,7 @@ A research-based Streamlit application for administering the Pet Parenting Style
 
 The underlying questionnaire is based on the 36-item Pet Parenting Style scale developed in research led by Lauren Brubaker under the supervision of Dr. Monique Udell within the OSU Human–Animal Interaction context. This repository contains Alisa Tananaeva's Streamlit prototype for practical administration, score calculation, and profile visualization.
 
-`pps_app.py` is the current main app: one question per screen, progress bar, Back/Continue, a clean result screen (including mixed-style output when classification is borderline), and an optional research consent flow (consent → contact → optional demographics → completion). The legacy one-page prototype is kept in `archive/PPS_1.py`.
+`pps_app.py` is the current main app: one question per screen, progress bar, Back/Continue, a clean result screen (including mixed-style output when classification is borderline), and an optional research consent flow (consent → contact → optional pet information → completion).
 
 > **Research prototype** · Python 3.10+ & Streamlit · Functional research app with optional Supabase storage
 
@@ -19,7 +19,7 @@ The underlying questionnaire is based on the 36-item Pet Parenting Style scale d
 - Computes **three subscale means** (12 items each): Permissive, Authoritative, Authoritarian.
 - Assigns a **most probable parenting style** by Euclidean distance from the respondent’s \([P, A_{auth}, A_{authn}]\) profile to three fixed **centroids**, after per-style **bias multipliers** (\(\beta_{perm}\), \(\beta_{authv}\), \(\beta_{authn}\)).
 - Computes normative **z-scores and approximate percentiles** internally using embedded reference values (N = 953; normal-CDF approximation). The user-facing result screen is focused on the **style result**, a readable **interpretation**, and a donut chart of model-based similarity (\(\exp(-d_{eff})\)).
-- Optional post-questionnaire flow (mirrors `DSLQ_App`): **research consent**, optional **future-contact**, optional **demographics**, and **completion** screen.
+- Optional post-questionnaire flow (mirrors `DSLQ_App`): **research consent**, optional **future-contact**, optional **pet information**, and **completion** screen.
 
 ---
 
@@ -33,7 +33,7 @@ The underlying questionnaire is based on the 36-item Pet Parenting Style scale d
 | Norms | Embedded means/SDs (953-pet reference sample) |
 | Privacy | Answers live in the current Streamlit session unless you explicitly opt in to share data for research |
 | Copy | UI text is loaded from `PPS_App_Copy_Extended.csv` |
-| Optional modules | Optional demographics are defined in `PPS_App_OptionalModules.csv` |
+| Optional modules | Optional pet information fields are defined in `PPS_App_OptionalModules.csv` |
 | Storage | Supabase (optional) or local JSON fallback (see `pps_research.py`) |
 
 ---
@@ -47,15 +47,9 @@ PPS/
 ├── pps_mixed_ambiguous_logic.py   # Borderline / mixed-style thresholds + labels
 ├── pps_research.py                # Export payload + optional Supabase/local persistence
 ├── PPS_App_Copy_Extended.csv      # UI copy (key,text)
-├── PPS_App_OptionalModules.csv    # Optional demographics module definitions
-├── .streamlit/
+├── PPS_App_OptionalModules.csv    # Optional pet information field definitions
+├── streamlit/
 │   └── secrets.toml.example       # Supabase secrets template (optional)
-├── archive/
-│   ├── PPS_1.py                   # Legacy one-page prototype (baseline)
-│   ├── PPS_Scoring.py             # Archived batch scoring helper (not used by app)
-│   └── PPS_App_Copy_ru.csv        # Archived RU copy draft (not used by app)
-├── docs/
-│   └── PPS_Stage1_Baseline.md     # Baseline freeze note (documentation)
 ├── requirements.txt
 └── README.md
 ```
@@ -73,12 +67,6 @@ python3 -m streamlit run pps_app.py
 ```
 
 Open the local URL (typically `http://localhost:8501`). Answer all items, then proceed through consent/contact (optional) and view your result.
-
-To run the legacy baseline one-page app:
-
-```bash
-python3 -m streamlit run archive/PPS_1.py
-```
 
 ---
 
@@ -134,7 +122,6 @@ The **Pet Parenting Style questionnaire** was developed in the research program 
 
 - Functional research app (DSLQ-style UI flow)
 - Main entry point: `pps_app.py`
-- Legacy baseline kept: `archive/PPS_1.py`
 - Further interface refinement and interpretation layers may be added later
 
 ---
